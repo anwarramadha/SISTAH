@@ -14,6 +14,8 @@ import sys
 
 PORTS = [13320, 13321, 13322, 13323, 13324]
 WORKERS = [13330, 13331, 13332]
+DAEMONS = [13340, 13341, 13342]
+
 timeout = randint(3, 5)
 receive_heartbeat = 'N'
 cpu_loads = []
@@ -75,6 +77,7 @@ class Server(BaseHTTPRequestHandler):
 
 				if role == 'LEADER':
 					url = "http://localhost:"+str(cpu_loads[0].port)+"/"+data
+					#url = "http://localhost:"+"13337"+"/"+data
 					response = urllib.request.urlopen(url).read()
 
 					prime_number = response.decode('utf-8')
@@ -136,13 +139,13 @@ class Client:
 					pass
 
 		cpu_loads = []
-		for port in WORKERS:
+		for port in DAEMONS:
 			url = "http://localhost:"+str(port)+"/reqcpuloads"
 			try:
 				response = urllib.request.urlopen(url).read()
 				cpu_load = float(response.decode('utf-8'))
 
-				worker = WorkerCpuLoads(port, cpu_load)
+				worker = WorkerCpuLoads(WORKERS[DAEMONS.index(port)], cpu_load)
 				cpu_loads.append(worker)
 			except:
 				pass
