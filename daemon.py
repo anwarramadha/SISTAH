@@ -4,6 +4,8 @@ import psutil
 import os
 import sys
 
+PORT = 13340
+
 class WorkerHandler(BaseHTTPRequestHandler):  
     def do_GET(self):
         try:
@@ -24,8 +26,6 @@ class WorkerHandler(BaseHTTPRequestHandler):
     def cpu_usage(self):
     	proc = psutil.Process(os.getpid())
     	return proc.memory_percent()
-
-PORT = int(sys.argv[1])
 
 server = HTTPServer(("", PORT), WorkerHandler)
 server.serve_forever()

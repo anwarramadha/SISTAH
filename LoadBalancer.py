@@ -13,8 +13,11 @@ import operator
 import sys
 
 PORTS = [13320, 13321, 13322, 13323, 13324]
-WORKERS = [13330, 13331, 13332]
-DAEMONS = [13340, 13341, 13342]
+
+# bagian ini yang harus disimpan adalah IP address karena yang 
+# digunakan beda komputer
+WORKERS = 13337
+DAEMONS = 13340
 
 timeout = randint(3, 5)
 receive_heartbeat = 'N'
@@ -23,6 +26,8 @@ role = "FOLLOWER"
 forward = 0
 leader_port = None
 term = 0
+
+append_entries = []
 
 class WorkerCpuLoads:
 	def __init__(self, worker_port, worker_cpu_load):
@@ -116,12 +121,13 @@ class Server(BaseHTTPRequestHandler):
 class Client:
 	def __init__(self):
 		self.count = 0
-		self.leader_timeout = randint(0, 1)
+		self.leader_timeout = 1
 
 	# thread 
 	def run(self):
 		Thread(target=self.timeout).start()
 		Thread(target=self.leader_timeout_counter).start()
+		Thread(target=self.request_cpu_loads).start()
 
 	# kalau suatu node menjadi leader, maka setiap periode
 	# tertentu, node ini akan mengirimkan hearbeat kesemua
@@ -130,6 +136,7 @@ class Client:
 	def broadcast_heartbeat(self):
 		print("send heartbeat")
 		global cpu_loads, term 
+
 		for port in PORTS:
 			if port != PORT:
 				url = "http://localhost:"+str(port)+"/heartbeat/"+str(PORT)
@@ -137,20 +144,6 @@ class Client:
 					urllib.request.urlopen(url).read()
 				except:
 					pass
-
-		cpu_loads = []
-		for port in DAEMONS:
-			url = "http://localhost:"+str(port)+"/reqcpuloads"
-			try:
-				response = urllib.request.urlopen(url).read()
-				cpu_load = float(response.decode('utf-8'))
-
-				worker = WorkerCpuLoads(WORKERS[DAEMONS.index(port)], cpu_load)
-				cpu_loads.append(worker)
-			except:
-				pass
-
-		cpu_loads.sort(key=operator.attrgetter('cpu_load'))
 
 	# apabila pada waktu tertentu leader tidak mengirimkan
 	# heartbeat, maka diasumsikan leader telah crash, sehingga
@@ -226,8 +219,39 @@ class Client:
 				self.leader_timeout -= 1
 				if self.leader_timeout == 0:
 					self.broadcast_heartbeat()
-					self.leader_timeout = randint(0, 1)
+					self.leader_timeout = 1
 
+			sleep(1)
+
+	def request_cpu_loads(self):
+		global append_entries, cpu_loads, role
+		self.timeout = 5
+		while True:
+			self.timeout -= 1
+			if self.timeout == 0:
+				if role == 'LEADER':
+					print("gg")
+					cpu_loads = []
+					url = "http://localhost:"+str(DAEMONS)+"/reqcpuloads"
+					try:
+						response = urllib.request.urlopen(url).read()
+						cpu_load = float(response.decode('utf-8'))
+
+						worker = WorkerCpuLoads(13337, cpu_load)
+						# worker = WorkerCpuLoads(WORKERS[DAEMONS.index(port)], cpu_load)
+						cpu_loads.append(worker)
+					except:
+						pass
+
+					# ketika leader menerima cpu loads dari daemon, maka entries akan
+					# ditambahkan kedalam log leader, namun belum di commit, yang artinya
+					# entries belum di tulis kedalam file.
+					cpu_loads.sort(key=operator.attrgetter('cpu_load'))
+					append_entries.append(cpu_loads)
+					print(cpu_loads)
+				self.timeout = 5
+
+				self.cpu_loads_received = 'Y'
 			sleep(1)
 
 PORT = int(sys.argv[1])

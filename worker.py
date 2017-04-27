@@ -6,6 +6,8 @@ import psutil
 import os
 import sys
 
+PORT = 13337
+
 class WorkerHandler(BaseHTTPRequestHandler):
     def prime(self, n):
         i = 2
@@ -28,17 +30,10 @@ class WorkerHandler(BaseHTTPRequestHandler):
             args = self.path.split('/')
             if len(args) != 2:
                 raise Exception()
-
-            command = args[1]
-            if command == 'reqcpuloads':
-            	self.send_response(200)
-            	self.end_headers()
-            	self.wfile.write(str(self.cpu_usage()).encode('utf-8'))
-            else:
-            	n = int(args[1])
-            	self.send_response(200)
-            	self.end_headers()
-            	self.wfile.write(str(self.calc(n)).encode('utf-8'))
+            n = int(args[1])
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(str(self.calc(n)).encode('utf-8'))
         except Exception as ex:
             self.send_response(500)
             self.end_headers()
@@ -47,8 +42,6 @@ class WorkerHandler(BaseHTTPRequestHandler):
     def cpu_usage(self):
     	proc = psutil.Process(os.getpid())
     	return proc.memory_percent()
-
-PORT = int(sys.argv[1])
 
 server = HTTPServer(("", PORT), WorkerHandler)
 server.serve_forever()
