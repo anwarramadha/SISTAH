@@ -16,8 +16,8 @@ PORTS = [13320, 13321, 13322, 13323, 13324]
 
 # bagian ini yang harus disimpan adalah IP address karena yang 
 # digunakan beda komputer
-WORKERS = 13337
-DAEMONS = 13340
+WORKERS = ['http://192.168.43.142', 'http://localhost']
+DAEMONS = ['http://192.168.43.142', 'http://localhost']
 
 timeout = randint(3, 5)
 receive_heartbeat = 'N'
@@ -95,8 +95,8 @@ class Server(BaseHTTPRequestHandler):
 
 			elif req == 'appendentries':
 				file = open(str(PORT)+"-cpuloads.txt","a") 
-				file.write(str(7777)+"\n")
-				file.write(args[3])
+				file.write(args[4]+"\n")
+				file.write(args[3]+"\n")
 				file.close() 
 
 			# Bagian ini adalah request dari client yang berisi
@@ -156,6 +156,7 @@ class Server(BaseHTTPRequestHandler):
 class Client:
 	def __init__(self):
 		self.count = 0
+		self.daemon_count = len(DAEMONS)
 		self.leader_timeout = 1
 
 	# thread 
@@ -286,44 +287,56 @@ class Client:
 						file.close() 
 					
 					cpu_loads = []
-					url = "http://localhost:"+str(DAEMONS)+"/reqcpuloads"
-					try:
-						response = urllib.request.urlopen(url).read()
-						cpu_load = float(response.decode('utf-8'))
+					daemon_count = 0
+					for ip in DAEMONS:
+						url = ip+":"+str(DAEMONS)+"/reqcpuloads"
+						try:
+							response = urllib.request.urlopen(url).read()
+							cpu_load = float(response.decode('utf-8'))
 
-						worker = WorkerCpuLoads(13337, cpu_load)
-						# worker = WorkerCpuLoads(WORKERS[DAEMONS.index(port)], cpu_load)
-						cpu_loads.append(worker)
-					except:
-						pass
+							worker = WorkerCpuLoads(ip, cpu_load)
+							# worker = WorkerCpuLoads(WORKERS[DAEMONS.index(port)], cpu_load)
+							cpu_loads.append(worker)
+						except:
+							daemon_count += 1
+
+					if daemon_count == self.daemon_count:
+						self.get_cpu_loads_from_file()
 
 					cpu_loads.sort(key=operator.attrgetter('cpu_load'), reverse=True)
 
 					for port in PORTS:
-						url = "http://localhost:"+str(port)+"/appendentries/"+str(port)+"/"+str(cpu_load)+"/ininantisidisiipaddress"
+						for item in cpu_loads:
+							url = "http://localhost:"+str(port)+"/appendentries/"+str(port)+"/"+str(item.cpu_load)+"/"+item.ip
 
-						try:
-							response = urllib.request.urlopen(url).read()
-							print("append")
-							
-						except:
-							pass
+							try:
+								response = urllib.request.urlopen(url).read()
+								print("append")
+								
+							except:
+								pass
 					# ketika leader menerima cpu loads dari daemon, maka entries akan
 					# ditambahkan kedalam log leader, namun belum di commit, yang artinya
 					# entries belum di tulis kedalam file.
-					file = open(str(PORT)+"-cpuloads.txt","a") 
+					file = open(str(PORT)+"-cpuloads.txt","w") 
 					for item in cpu_loads:
-							file.write("%s\n" % str(item.port))
-							file.write("%s\n" % str(item.cpu_load))
+						file.write("%s\n" % str(item.ip))
+						file.write("%s\n" % str(item.cpu_load))
 					
-					file.write("%s\n" % str(PORT)) 
-					file.close() 
-					print(cpu_loads)
+					file.close()
 					# Simpan siapa ketua dan log cpu load
 				self.timeout = 5
 
 				self.cpu_loads_received = 'Y'
 			sleep(1)
+
+	def get_cpu_loads_from_file():
+		global cpu_loads
+		fileHandle = open (str(PORT)+"-cpuloads.txt","r" )
+		lineList = fileHandle.readlines()
+		fileHandle.close()
+		return lineList
+
 
 def readFile():
 	global count_leader
