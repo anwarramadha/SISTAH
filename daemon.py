@@ -7,6 +7,9 @@ import sys
 PORT = 13340
 
 class WorkerHandler(BaseHTTPRequestHandler):  
+    #Fungsi ini figunakan untuk merespon get request
+    #jika command yang didapat adalah reqcpuloads
+    #fungsi akan mengembalikan CPU usage dari cpu komputer
     def do_GET(self):
         try:
             args = self.path.split('/')
@@ -23,9 +26,10 @@ class WorkerHandler(BaseHTTPRequestHandler):
             self.end_headers()
             print(ex)
 
+    #Fungsi untuk mengambil CPU usage
+    #Library yang kami gunakan adalah psutil
     def cpu_usage(self):
-    	proc = psutil.Process(os.getpid())
-    	return proc.memory_percent()
+    	return psutil.cpu_percent()
 
 server = HTTPServer(("", PORT), WorkerHandler)
 server.serve_forever()
