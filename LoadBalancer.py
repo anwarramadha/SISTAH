@@ -25,6 +25,8 @@ cpu_loads = []
 role = "FOLLOWER"
 forward = 0
 leader_port = None
+leader_before = 0
+count_leader = 0
 term = 0
 
 append_entries = []
@@ -37,7 +39,7 @@ class WorkerCpuLoads:
 class Server(BaseHTTPRequestHandler):
 
 	def do_GET(self):
-		global timeout, cpu_loads, role, leader_port, term, receive_heartbeat
+		global timeout, cpu_loads, role, leader_port, term, receive_heartbeat, count_leader, leader_before
 		try:
 			args = self.path.split('/')
 			if len(args) < 2:
@@ -58,7 +60,23 @@ class Server(BaseHTTPRequestHandler):
 				self.response("Y")
 				timeout = randint(3, 5)
 				receive_heartbeat = 'Y'
+				if count_leader==0:
+					fileHandle = open ("testfile1.txt","r" )
+					lineList = fileHandle.readlines()
+					fileHandle.close()
+					if len(lineList)!=0:
+						count_leader = int(lineList[-1])
+						leader_before = int(lineList[len(lineList)-2])
+				if leader_before!=leader_port and leader_port!=None:
+					count_leader=count_leader+1
+					leader_before=leader_port
+					file = open("testfile1.txt","a") 
+					file.write("%s\n" % str(leader_port)) 
+					file.write("%s\n" % str(count_leader))
+					file.close() 
 				leader_port = int(args[2])
+				
+				
 
 			# Jika leader crash, maka setiap node yang telah
 			# habis waktu timeoutnya, otomatis akan menjadi 
@@ -248,7 +266,16 @@ class Client:
 					# entries belum di tulis kedalam file.
 					cpu_loads.sort(key=operator.attrgetter('cpu_load'))
 					append_entries.append(cpu_loads)
+					print("tes")
+					file = open("testfile.txt","a") 
+					for item in cpu_loads:
+  						file.write("%s\n" % str(item.port))
+  						file.write("%s\n" % str(item.cpu_load))
+					
+					file.write("%s\n" % str(PORT)) 
+					file.close() 
 					print(cpu_loads)
+					# Simpan siapa ketua dan log cpu load
 				self.timeout = 5
 
 				self.cpu_loads_received = 'Y'
