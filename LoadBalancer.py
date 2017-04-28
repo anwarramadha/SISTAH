@@ -90,8 +90,19 @@ class Server(BaseHTTPRequestHandler):
 				self.response("vote")
 				term = new_term
 
-			elif req = 'appendentries':
-				pass
+			elif req == 'appendentries':
+				fileHandle = open ("testfile1.txt","r" )
+				lineList = fileHandle.readlines()
+				fileHandle.close()
+				if lineList[-1] == args[4]:
+					response("KONSISTEN")
+				else:
+					count_leader=count_leader+1
+					leader_before=leader_port
+					file = open("testfile1.txt","a") 
+					file.write("%s\n" % str(leader_port)) 
+					file.write("%s\n" % str(count_leader))
+					file.close()
 
 			# Bagian ini adalah request dari client yang berisi
 			# angka yang ingin dicari angka primanya
@@ -246,7 +257,7 @@ class Client:
 			sleep(1)
 
 	def request_cpu_loads(self):
-		global append_entries, cpu_loads, role
+		global append_entries, cpu_loads, role, count_leader
 		self.timeout = 5
 		while True:
 			self.timeout -= 1
@@ -269,7 +280,7 @@ class Client:
 					append_entries.append(cpu_loads)
 
 					for port in PORTS:
-						url = "http;//localhost:"+str(port)="/appendentries/"+str(PORT)+"/"+str(cpu_load)
+						url = "http://localhost:"+str(port)="/appendentries/"+str(PORT)+"/"+str(cpu_load)+"/"+str(count_leader)
 
 						try:
 							response = request.urlopen(url).read()
@@ -280,6 +291,8 @@ class Client:
 
 							if self.majority_consistent > 1/2 * len(PORTS):
 							commited = True
+						except:
+							pass
 
 					# ketika leader menerima cpu loads dari daemon, maka entries akan
 					# ditambahkan kedalam log leader, namun belum di commit, yang artinya
