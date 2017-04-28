@@ -67,6 +67,7 @@ class Server(BaseHTTPRequestHandler):
 					if len(lineList)!=0:
 						count_leader = int(lineList[-1])
 						leader_before = int(lineList[len(lineList)-2])
+
 				if leader_before!=leader_port and leader_port!=None:
 					count_leader=count_leader+1
 					leader_before=leader_port
@@ -88,6 +89,9 @@ class Server(BaseHTTPRequestHandler):
 				# if role == 'FOLLOWER':
 				self.response("vote")
 				term = new_term
+
+			elif req = 'appendentries':
+				pass
 
 			# Bagian ini adalah request dari client yang berisi
 			# angka yang ingin dicari angka primanya
@@ -153,11 +157,11 @@ class Client:
 	# dirinya belum crash
 	def broadcast_heartbeat(self):
 		print("send heartbeat")
-		global cpu_loads, term 
+		global cpu_loads, term, count_leader 
 
 		for port in PORTS:
 			if port != PORT:
-				url = "http://localhost:"+str(port)+"/heartbeat/"+str(PORT)
+				url = "http://localhost:"+str(port)+"/heartbeat/"+str(PORT)+"/"+str(count_leader)
 				try:
 					urllib.request.urlopen(url).read()
 				except:
@@ -246,6 +250,7 @@ class Client:
 		self.timeout = 5
 		while True:
 			self.timeout -= 1
+			self.majority_consistent = 0
 			if self.timeout == 0:
 				if role == 'LEADER':
 					print("gg")
@@ -260,26 +265,41 @@ class Client:
 						cpu_loads.append(worker)
 					except:
 						pass
+					cpu_loads.sort(key=operator.attrgetter('cpu_load'))
+					append_entries.append(cpu_loads)
+
+					for port in PORTS:
+						url = "http;//localhost:"+str(port)="/appendentries/"+str(PORT)+"/"+str(cpu_load)
+
+						try:
+							response = request.urlopen(url).read()
+							data = response.encode('utf-8')
+
+							if data == 'KONSISTEN':
+								self.majority_consistent += 1
+
+							if self.majority_consistent > 1/2 * len(PORTS):
+							commited = True
 
 					# ketika leader menerima cpu loads dari daemon, maka entries akan
 					# ditambahkan kedalam log leader, namun belum di commit, yang artinya
 					# entries belum di tulis kedalam file.
-					cpu_loads.sort(key=operator.attrgetter('cpu_load'))
-					append_entries.append(cpu_loads)
-					print("tes")
-					file = open("testfile.txt","a") 
-					for item in cpu_loads:
-  						file.write("%s\n" % str(item.port))
-  						file.write("%s\n" % str(item.cpu_load))
-					
-					file.write("%s\n" % str(PORT)) 
-					file.close() 
-					print(cpu_loads)
+					if commited:
+						print("tes")
+						file = open("testfile.txt","a") 
+						for item in cpu_loads:
+	  						file.write("%s\n" % str(item.port))
+	  						file.write("%s\n" % str(item.cpu_load))
+						
+						file.write("%s\n" % str(PORT)) 
+						file.close() 
+						print(cpu_loads)
 					# Simpan siapa ketua dan log cpu load
 				self.timeout = 5
 
 				self.cpu_loads_received = 'Y'
 			sleep(1)
+
 
 PORT = int(sys.argv[1])
 
