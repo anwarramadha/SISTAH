@@ -61,7 +61,7 @@ class Server(BaseHTTPRequestHandler):
 				timeout = randint(3, 5)
 				receive_heartbeat = 'Y'
 				if count_leader==0:
-					fileHandle = open ("testfile1.txt","r" )
+					fileHandle = open (str(PORT)+".txt","r" )
 					lineList = fileHandle.readlines()
 					fileHandle.close()
 					if len(lineList)!=0:
@@ -71,7 +71,7 @@ class Server(BaseHTTPRequestHandler):
 				if leader_before!=leader_port and leader_port!=None:
 					count_leader=count_leader+1
 					leader_before=leader_port
-					file = open("testfile1.txt","a") 
+					file = open(str(PORT)+".txt","a") 
 					file.write("%s\n" % str(leader_port)) 
 					file.write("%s\n" % str(count_leader))
 					file.close() 
@@ -90,7 +90,7 @@ class Server(BaseHTTPRequestHandler):
 				self.response("vote")
 				term = new_term
 
-			elif req = 'appendentries':
+			elif req == 'appendentries':
 				pass
 
 			# Bagian ini adalah request dari client yang berisi
@@ -246,13 +246,28 @@ class Client:
 			sleep(1)
 
 	def request_cpu_loads(self):
-		global append_entries, cpu_loads, role
+		global append_entries, cpu_loads, role, count_leader, leader_before
 		self.timeout = 5
 		while True:
 			self.timeout -= 1
 			self.majority_consistent = 0
 			if self.timeout == 0:
 				if role == 'LEADER':
+					if count_leader==0:
+						fileHandle = open (str(PORT)+".txt","r" )
+						lineList = fileHandle.readlines()
+						fileHandle.close()
+						if len(lineList)!=0:
+							count_leader = int(lineList[-1])
+							leader_before = int(lineList[len(lineList)-2])
+					if leader_before!=PORT and PORT!=None:
+						count_leader=count_leader+1
+						leader_before=PORT
+						file = open(str(PORT)+".txt","a") 
+						file.write("%s\n" % str(PORT)) 
+						file.write("%s\n" % str(count_leader))
+						file.close() 
+					
 					print("gg")
 					cpu_loads = []
 					url = "http://localhost:"+str(DAEMONS)+"/reqcpuloads"
@@ -269,7 +284,7 @@ class Client:
 					append_entries.append(cpu_loads)
 
 					for port in PORTS:
-						url = "http;//localhost:"+str(port)="/appendentries/"+str(PORT)+"/"+str(cpu_load)
+						#url = "http://localhost:"+str(port)="/appendentries/"+str(PORT)+"/"+str(cpu_load)
 
 						try:
 							response = request.urlopen(url).read()
@@ -279,8 +294,9 @@ class Client:
 								self.majority_consistent += 1
 
 							if self.majority_consistent > 1/2 * len(PORTS):
-							commited = True
-
+								commited = True
+						except:
+							pass
 					# ketika leader menerima cpu loads dari daemon, maka entries akan
 					# ditambahkan kedalam log leader, namun belum di commit, yang artinya
 					# entries belum di tulis kedalam file.
@@ -288,8 +304,8 @@ class Client:
 						print("tes")
 						file = open("testfile.txt","a") 
 						for item in cpu_loads:
-	  						file.write("%s\n" % str(item.port))
-	  						file.write("%s\n" % str(item.cpu_load))
+								file.write("%s\n" % str(item.port))
+								file.write("%s\n" % str(item.cpu_load))
 						
 						file.write("%s\n" % str(PORT)) 
 						file.close() 
