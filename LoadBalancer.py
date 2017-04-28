@@ -32,8 +32,8 @@ term = 0
 append_entries = []
 
 class WorkerCpuLoads:
-	def __init__(self, worker_port, worker_cpu_load):
-		self.port = worker_port
+	def __init__(self, ip, worker_cpu_load):
+		self.ip = ip
 		self.cpu_load = worker_cpu_load
 
 class Server(BaseHTTPRequestHandler):
@@ -68,8 +68,8 @@ class Server(BaseHTTPRequestHandler):
 						count_leader = int(lineList[-1])
 						leader_before = int(lineList[len(lineList)-2])
 
-				if leader_before!=leader_port and leader_port!=None:
-					count_leader=count_leader+1
+				if leader_before != leader_port and leader_port!=None:
+					count_leader=int(args[3])
 					leader_before=leader_port
 					file = open(str(PORT)+".txt","a") 
 					file.write("%s\n" % str(leader_port)) 
@@ -87,22 +87,17 @@ class Server(BaseHTTPRequestHandler):
 			# perhitungan agar menjadi leader.
 			elif req == 'vote' and new_term != term and new_term > term:
 				# if role == 'FOLLOWER':
-				self.response("vote")
-				term = new_term
+				if count_leader <= int(args[3]):
+					self.response("voteyou")
+					term = new_term
+				else:
+					self.response("notvote")
 
 			elif req == 'appendentries':
-				fileHandle = open (str(PORT)+".txt","r" )
-				lineList = fileHandle.readlines()
-				fileHandle.close()
-				if lineList[-1] == args[4]:
-					response("KONSISTEN")
-				else:
-					count_leader=count_leader+1
-					leader_before=leader_port
-					file = open(str(PORT)+".txt","a") 
-					file.write("%s\n" % str(leader_port)) 
-					file.write("%s\n" % str(count_leader))
-					file.close()
+				file = open(str(PORT)+"-cpuloads.txt","a") 
+				file.write(str(7777)+"\n")
+				file.write(args[3])
+				file.close() 
 
 			# Bagian ini adalah request dari client yang berisi
 			# angka yang ingin dicari angka primanya
@@ -140,6 +135,13 @@ class Server(BaseHTTPRequestHandler):
 				self.send_response(200)
 				self.end_headers()
 				self.wfile.write('voteyou'.encode('utf-8'))
+			except:
+				pass
+		elif message == 'notvote':
+			try:
+				self.send_response(200)
+				self.end_headers()
+				# self.wfile.write(message.encode('utf-8'))
 			except:
 				pass
 		else:
@@ -187,13 +189,14 @@ class Client:
 	# menjadi leader.
 	def do_Campaign(self):
 		print("do campaign")
-		global role, term
+		global role, term, count_leader
 		term += 1
 		self.count = 1
 		role = "CANDIDATE"
+		print(count_leader)
 		for port in PORTS:
 			if port != PORT:
-				url = "http://localhost:"+str(port)+"/vote/"+str(term)
+				url = "http://localhost:"+str(port)+"/vote/"+str(term)+"/"+str(count_leader)
 				try:
 					response = urllib.request.urlopen(url).read()
 					data = response.decode('utf-8')
@@ -213,7 +216,8 @@ class Client:
 	# leader
 	def become_leader(self):
 		print("become leader")
-		global role
+		global role, count_leader
+		count_leader += 1
 		role = "LEADER"
 		self.broadcast_heartbeat()
 
@@ -262,8 +266,10 @@ class Client:
 		while True:
 			self.timeout -= 1
 			self.majority_consistent = 0
+			commited = False
 			if self.timeout == 0:
 				if role == 'LEADER':
+					print("ggg")
 					if count_leader==0:
 						fileHandle = open (str(PORT)+".txt","r" )
 						lineList = fileHandle.readlines()
@@ -271,15 +277,14 @@ class Client:
 						if len(lineList)!=0:
 							count_leader = int(lineList[-1])
 							leader_before = int(lineList[len(lineList)-2])
+
 					if leader_before!=PORT and PORT!=None:
-						count_leader=count_leader+1
 						leader_before=PORT
 						file = open(str(PORT)+".txt","a") 
 						file.write("%s\n" % str(PORT)) 
 						file.write("%s\n" % str(count_leader))
 						file.close() 
 					
-					print("gg")
 					cpu_loads = []
 					url = "http://localhost:"+str(DAEMONS)+"/reqcpuloads"
 					try:
@@ -291,46 +296,48 @@ class Client:
 						cpu_loads.append(worker)
 					except:
 						pass
-					cpu_loads.sort(key=operator.attrgetter('cpu_load'))
-					append_entries.append(cpu_loads)
+
+					cpu_loads.sort(key=operator.attrgetter('cpu_load'), reverse=True)
 
 					for port in PORTS:
-						url = "http://localhost:"+str(port)+"/appendentries/"+str(PORT)+"/"+str(cpu_load)+"/"+str(count_leader)
+						url = "http://localhost:"+str(port)+"/appendentries/"+str(port)+"/"+str(cpu_load)+"/ininantisidisiipaddress"
 
 						try:
-							response = request.urlopen(url).read()
-							data = response.encode('utf-8')
-
-							if data == 'KONSISTEN':
-								self.majority_consistent += 1
-
-							if self.majority_consistent > 1/2 * len(PORTS):
-								commited = True
+							response = urllib.request.urlopen(url).read()
+							print("append")
+							
 						except:
 							pass
 					# ketika leader menerima cpu loads dari daemon, maka entries akan
 					# ditambahkan kedalam log leader, namun belum di commit, yang artinya
 					# entries belum di tulis kedalam file.
-					if commited:
-						print("tes")
-						file = open("testfile.txt","a") 
-						for item in cpu_loads:
-								file.write("%s\n" % str(item.port))
-								file.write("%s\n" % str(item.cpu_load))
-						
-						file.write("%s\n" % str(PORT)) 
-						file.close() 
-						print(cpu_loads)
+					file = open(str(PORT)+"-cpuloads.txt","a") 
+					for item in cpu_loads:
+							file.write("%s\n" % str(item.port))
+							file.write("%s\n" % str(item.cpu_load))
+					
+					file.write("%s\n" % str(PORT)) 
+					file.close() 
+					print(cpu_loads)
 					# Simpan siapa ketua dan log cpu load
 				self.timeout = 5
 
 				self.cpu_loads_received = 'Y'
 			sleep(1)
 
+def readFile():
+	global count_leader
+	fileHandle = open (str(PORT)+".txt","r" )
+	lineList = fileHandle.readlines()
+	fileHandle.close()
+	if len(lineList)!=0:
+		count_leader = int(lineList[-1])
+		leader_before = int(lineList[len(lineList)-2])
 
 PORT = int(sys.argv[1])
 
 if __name__ == '__main__':
+	readFile()
 	thread = Client()
 	thread.run()
 
